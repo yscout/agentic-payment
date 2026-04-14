@@ -1,0 +1,38 @@
+{
+  "name": "agentic-payment",
+  "version": "1.0.0",
+  "description": "Machine-Native Payments for Autonomous AI Agents Using Smart Contracts",
+  "type": "module",
+  "scripts": {
+    "agent": "npx tsx agent/index.ts",
+    "agent:demo": "npx tsx agent/demo.ts",
+    "server:mock": "npx tsx server/mock.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yscout/agentic-payment.git"
+  },
+  "keywords": [
+    "ai-agent",
+    "x402",
+    "blockchain",
+    "payments",
+    "data-marketplace"
+  ],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/yscout/agentic-payment/issues"
+  },
+  "homepage": "https://github.com/yscout/agentic-payment#readme",
+  "dependencies": {
+    "@x402/evm": "^2.10.0",
+    "@x402/fetch": "^2.10.0",
+    "dotenv": "^17.4.2",
+    "ethers": "^6.16.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
+    "viem": "^2.47.17"
+  }
+}
