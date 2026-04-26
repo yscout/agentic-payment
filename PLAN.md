@@ -2,14 +2,14 @@
 
 ## Status
 
-| Person       | Role                 | Status                      |
-| ------------ | -------------------- | --------------------------- |
-| Person A     | Smart Contract       | NOT STARTED                 |
-| Person B     | Data Provider Server | NOT STARTED                 |
-| **Person C** | **Consumer Agent**   | **DONE** (code in `agent/`) |
-| Person D     | Integration + Report | NOT STARTED                 |
+| Person       | Role                     | Status                                      |
+| ------------ | ------------------------ | ------------------------------------------- |
+| Person A     | Smart Contract           | NOT STARTED                                 |
+| **Person B** | **Data Provider Server** | **DONE** (code in `server/`, tests in `test/`) |
+| **Person C** | **Consumer Agent**       | **DONE** (code in `agent/`)                 |
+| Person D     | Integration + Report     | NOT STARTED                                 |
 
-Person C's code is complete and defines the interfaces that Person A and B must match. See "Interface Contracts" below.
+Person B's and Person C's code is complete. Person A must match the contract ABI below, and Person D should use the run/configuration instructions in the Person B and D sections.
 
 ---
 
@@ -50,9 +50,9 @@ We use **x402** (Coinbase, 161M+ transactions, backed by Google/Cloudflare/Visa)
 
 ## Interface Contracts (CRITICAL -- everyone must match these)
 
-Person C's agent code is already written. Person A and B **must** match these exact interfaces or the system won't connect.
+Person C's agent code is already written, and Person B's server now matches the API endpoints below. Person A **must** match the smart contract ABI or the system won't connect.
 
-### API Endpoints (Person B must implement)
+### API Endpoints (Person B implemented)
 
 The agent POSTs to these three endpoints:
 
@@ -149,12 +149,13 @@ agentic-payment/
     DataMarketplace.sol
   scripts/                       # Person A
     deploy.ts
-  test/                          # Person A
-    DataMarketplace.test.ts
   server/                        # Person B
     index.ts                     # Express + x402 middleware
     datasets.ts                  # Dataset handlers
     provenance.ts                # On-chain purchase recording
+    provenance-utils.ts          # x402 buyer extraction helpers
+    pricing.ts                   # Dataset IDs, prices, and paths
+    config.ts                    # Server environment configuration
     mock.ts                      # Mock data provider (Person C, for local testing)
   agent/                         # Person C (DONE)
     index.ts                     # Main agent
@@ -166,6 +167,10 @@ agentic-payment/
     demo.ts                      # Demo mode (simulated)
   output/                        # Generated HTML reports (gitignored)
   hardhat.config.ts              # Person A
+  test/                          # Person A + Person B tests
+    DataMarketplace.test.ts      # Person A
+    server-datasets.test.ts      # Person B
+    server-provenance-utils.test.ts # Person B
   package.json                   # Shared (already set up)
   tsconfig.json                  # Shared (already set up)
   .env.example                   # Shared (already set up)
@@ -258,115 +263,106 @@ After deploy, share:
 
 ---
 
-## Person B -- Data Provider Server
+## Person B -- Data Provider Server (DONE)
 
 ### What to build
 
-An Express.js server that:
+Implemented an Express.js server that:
 
 1. Gates 3 data endpoints behind x402 payment middleware
-2. Serves data (LLM-enriched or mock)
-3. Records each purchase on the DataMarketplace contract
+2. Serves structured mock market data matching the consumer agent's expected response shapes
+3. Records each purchase on the DataMarketplace contract as a best-effort provenance write
 
-### Step-by-step
+### Completed implementation
 
-**Step 1: Install server dependencies**
+- `server/index.ts` -- Express app, x402 payment middleware, `/health`, and the three dataset routes
+- `server/datasets.ts` -- query validation, sentiment/financial/weather mock data generation, and route handlers
+- `server/provenance.ts` -- ethers.js contract integration for `recordPurchase(...)`
+- `server/provenance-utils.ts` -- extracts the buyer address from x402 payment payloads/headers
+- `server/pricing.ts` -- canonical dataset IDs and prices: sentiment `0`, financial `1`, weather `2`
+- `server/config.ts` -- server-side `.env` configuration
+- `test/server-datasets.test.ts` -- query validation, response shape, and handler provenance tests
+- `test/server-provenance-utils.test.ts` -- payment payload/header buyer extraction tests
+- `package.json` -- added `npm run server` and `npm test`
+- `.env.example` -- added Person B environment variables
+
+### Runtime configuration
+
+Person B needs these `.env` values:
+
+- `PROVIDER_WALLET_ADDRESS` -- receives x402 USDC payments
+- `PROVIDER_PRIVATE_KEY` -- signs `recordPurchase(...)`; must be the DataMarketplace owner wallet
+- `DATA_MARKETPLACE_ADDRESS` -- Person A's deployed contract address
+- `RPC_URL` -- Base Sepolia RPC URL
+- `X402_NETWORK=eip155:84532`
+- `X402_FACILITATOR_URL=https://x402.org/facilitator`
+- `ENABLE_X402=true`
+
+For local endpoint testing before wallet/contract setup, set `ENABLE_X402=false`. This disables the payment gate only; the endpoint behavior and response shapes remain the same.
+
+### Endpoint behavior
+
+The server implements the exact endpoints required by Person C's agent:
+
+```
+POST /api/data/sentiment
+POST /api/data/financial
+POST /api/data/weather
+```
+
+Each endpoint accepts:
+
+```json
+{ "query": "AAPL" }
+```
+
+Responses match the field shapes in the "Interface Contracts" section. Invalid or empty queries return `400`. Server errors return `500`. Missing/invalid payment returns `402` when `ENABLE_X402=true`.
+
+### Provenance behavior
+
+After a paid request succeeds, the server extracts the buyer address from the x402 payment payload/header and calls:
+
+```solidity
+recordPurchase(buyer, datasetId, pricePaid, keccak256(query))
+```
+
+This write is best-effort: if the contract is not configured or the transaction fails, the server logs the error but still serves the paid data response.
+
+### Verification
+
+After installing project dependencies, run:
 
 ```bash
-npm install express @x402/express
-npm install --save-dev @types/express
+npm test
 ```
 
-**Step 2: Write `server/index.ts`**
+For local smoke testing without payment:
 
-```typescript
-import express from "express";
-import { paymentMiddleware } from "@x402/express";
-
-const app = express();
-app.use(express.json());
-
-// x402 payment wall -- agent must pay USDC to access these endpoints
-app.use(paymentMiddleware({
-  payTo: process.env.PROVIDER_WALLET_ADDRESS,
-  routes: {
-    "POST /api/data/sentiment": { price: "$0.001", chain: "base-sepolia" },
-    "POST /api/data/financial": { price: "$0.002", chain: "base-sepolia" },
-    "POST /api/data/weather":   { price: "$0.0005", chain: "base-sepolia" },
-  }
-}));
-
-// Route handlers (see datasets.ts)
-app.post("/api/data/sentiment", handleSentiment);
-app.post("/api/data/financial", handleFinancial);
-app.post("/api/data/weather",   handleWeather);
-
-app.listen(4021, () => console.log("Data provider running on :4021"));
+```bash
+ENABLE_X402=false npm run server
+curl -X POST http://localhost:4021/api/data/sentiment \
+  -H "Content-Type: application/json" \
+  -d '{"query":"AAPL"}'
 ```
 
-**Step 3: Write `server/datasets.ts`**
+### Next steps for integration
 
-Each handler:
+1. Person A deploys `DataMarketplace` and registers datasets in the agreed order.
+2. Set `DATA_MARKETPLACE_ADDRESS` in `.env`.
+3. Set `PROVIDER_PRIVATE_KEY` to the contract owner/server wallet that can call `recordPurchase`.
+4. Set `PROVIDER_WALLET_ADDRESS` to the wallet that receives x402 USDC payments.
+5. Fund the agent wallet with Base Sepolia ETH and USDC.
+6. Run `npm run server`.
+7. Run `npm run agent`.
+8. Confirm `PurchaseRecorded` events on BaseScan and the agent's on-chain verification output.
 
-- Reads `req.body.query`
-- If `OPENAI_API_KEY` is set: calls OpenAI/Bedrock to generate real data
-- Otherwise: returns structured mock JSON
-- After responding, calls `recordPurchaseOnChain()` (fire-and-forget)
-
-Mock response examples (agent expects these field shapes):
-
-Sentiment:
-
-```json
-{ "ticker": "AAPL", "score": 0.72, "signal": "bullish", "confidence": 0.85, "sources": 15, "summary": "..." }
-```
-
-Financial:
-
-```json
-{ "topic": "...", "headline": "...", "summary": "...", "impact": "positive", "relevance": 0.9 }
-```
-
-Weather:
-
-```json
-{ "city": "NYC", "temperature_c": 22, "humidity_pct": 55, "conditions": "sunny", "wind_kph": 12, "forecast": "..." }
-```
-
-**Step 4: Write `server/provenance.ts`**
-
-After x402 payment succeeds:
-
-```typescript
-import { ethers } from "ethers";
-
-const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
-const signer = new ethers.Wallet(process.env.PROVIDER_PRIVATE_KEY, provider);
-const marketplace = new ethers.Contract(DATA_MARKETPLACE_ADDRESS, ABI, signer);
-
-async function recordPurchaseOnChain(buyer: string, datasetId: number, pricePaid: number, query: string) {
-  const queryHash = ethers.keccak256(ethers.toUtf8Bytes(query));
-  const tx = await marketplace.recordPurchase(buyer, datasetId, pricePaid, queryHash);
-  console.log(`Purchase recorded on-chain: ${tx.hash}`);
-}
-```
-
-The `buyer` address comes from the x402 payment header (the wallet that paid). Check x402 middleware docs for how to extract the payer address from the verified payment.
-
-**Step 5: Add npm script**
-
-In `package.json`:
-
-```json
-"server": "npx tsx server/index.ts"
-```
-
-### Timeline: Week 2 (after Person A deploys contract)
+### Timeline: Week 2
 
 ### Dependencies:
 
-- Needs Person A's contract address for provenance recording
-- Can develop and test the x402 + data endpoints without the contract (just skip the provenance call)
+- Server implementation is complete.
+- Full on-chain provenance still needs Person A's contract address and owner wallet.
+- End-to-end paid requests need funded Base Sepolia wallets and x402 facilitator availability.
 
 ---
 
@@ -413,7 +409,7 @@ Wire the three components together, prepare the demo, write the report.
 
 **Step 1: Integration wiring**
 
-Once A and B are done:
+Once Person A has deployed the contract and Person B's server env is configured:
 
 1. Put contract address in `.env`
 2. Fund a test wallet with USDC (Coinbase faucet)
@@ -475,22 +471,22 @@ Key sections:
 
 ### Timeline: Week 3
 
-### Dependencies: Needs A and B to be done first.
+### Dependencies: Needs Person A's contract deployment, Person B's server env configured, and a funded agent wallet.
 
 ---
 
 ## Dependency Graph
 
 ```
-Person A (Smart Contract, Week 1) ──> Person B (Server, Week 2) ──> Person D (Integration, Week 3)
-                                  ──> Person D                  
-Person C (Agent, DONE)            ──> Person D                  
+Person A (Smart Contract, Week 1) ──> Person D (Integration, Week 3)
+Person B (Server, DONE)            ──> Person D
+Person C (Agent, DONE)             ──> Person D
 ```
 
 Person A has zero dependencies -- start immediately.
-Person B can start the server without the contract (just skip provenance), but needs the contract address for full integration.
+Person B is implemented; full provenance needs Person A's contract address and owner/server wallet.
 Person C is done.
-Person D waits for A + B, then wires everything together.
+Person D waits for A's deployment, then wires together the completed server and agent.
 
 ---
 
@@ -535,7 +531,7 @@ Agent                   x402 Client         Server              x402 Middleware 
 - **Testnet USDC funding:** Use Coinbase faucet; if unavailable, Person A deploys a MockUSDC as backup
 - **Demo reliability:** Mock data fallback in server ensures demo works without LLM API keys
 - **Contract failure:** Provenance recording is best-effort; data still served if contract write fails
-- **Person dependencies:** Person C is done. Person B can develop server + x402 without contract. Only final integration needs all parts.
+- **Person dependencies:** Person B and Person C are done. Only Person A's contract and final integration remain.
 
 ---
 

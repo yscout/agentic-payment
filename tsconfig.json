@@ -12,6 +12,6 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["agent/**/*.ts", "server/**/*.ts", "scripts/**/*.ts"],
+  "include": ["agent/**/*.ts", "server/**/*.ts", "scripts/**/*.ts", "test/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

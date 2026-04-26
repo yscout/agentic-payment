@@ -87,6 +87,9 @@ npm run agent:demo
 # Real mode -- requires funded wallet + running data provider
 npm run agent
 
+# Real data provider -- requires provider wallet + x402/server dependencies
+npm run server
+
 # Mock data provider -- randomized responses for local testing
 npm run server:mock
 ```
@@ -99,6 +102,9 @@ npm run server:mock
 | `RPC_URL` | `https://sepolia.base.org` | Base Sepolia RPC |
 | `SERVER_URL` | `http://localhost:4021` | Data provider URL |
 | `DATA_MARKETPLACE_ADDRESS` | (empty) | Contract address (from Person A) |
+| `PROVIDER_WALLET_ADDRESS` | (empty) | Provider wallet that receives x402 payments |
+| `PROVIDER_PRIVATE_KEY` | (empty) | Owner/server wallet used to record purchases on-chain |
+| `ENABLE_X402` | `true` | Set `false` only for local endpoint testing |
 | `QUERY_INTERVAL_SECONDS` | `3` | Seconds between queries |
 | `MAX_QUERIES` | `0` | Max queries (0 = unlimited) |
 
@@ -114,6 +120,10 @@ npm run server:mock
 | `agent/visualize.ts` | HTML report generator with Chart.js graphs (saved to `output/`) |
 | `agent/provenance.ts` | On-chain purchase history verification via DataMarketplace contract |
 | `server/mock.ts` | Mock data provider: randomized sentiment, financial, and weather responses |
+
+### Real Data Provider
+
+Person B's production server is implemented in `server/index.ts`. It gates the three data endpoints with x402, serves structured sentiment/financial/weather data, and records successful purchases on the `DataMarketplace` contract when `DATA_MARKETPLACE_ADDRESS` and `PROVIDER_PRIVATE_KEY` are configured.
 
 ### What the Agent Does
 
