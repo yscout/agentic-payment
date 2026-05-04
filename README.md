@@ -8,9 +8,9 @@ An on-chain data marketplace where autonomous AI agents pay for curated datasets
 Consumer Agent (agent/)          Data Provider (server/)          Base Sepolia
 ┌──────────────────┐            ┌──────────────────────┐        ┌──────────────────┐
 │ ethers.js wallet │──POST───>  │ Express + x402       │        │ USDC token       │
-│ x402 auto-pay    │<──402───── │ paymentMiddleware     │        │ DataMarketplace  │
-│ research plan    │──pay+retry>│ dataset handlers      │──tx──> │ contract         │
-│ report generator │<──data──── │ randomized data       │        │ (purchase logs)  │
+│ x402 auto-pay    │<──402───── │ paymentMiddleware    │        │ DataMarketplace  │
+│ research plan    │──pay+retry>│ dataset handlers     │──tx──> │ contract         │
+│ report generator │<──data──── │ randomized data      │        │ (purchase logs)  │
 └──────────────────┘            └──────────────────────┘        └──────────────────┘
 ```
 
@@ -46,7 +46,7 @@ The autonomous consumer agent has a **mission**: produce an investment research 
 
 | Dataset | Price per query | Purpose |
 |---------|----------------|---------|
-| Sentiment | $0.001 USDC | Market mood score (-1 to +1) per stock |
+| Sentiment | $0.001 USDC | Market mood score (-1 to +1) per stock |  
 | Financial | $0.002 USDC | Earnings, revenue, analyst headlines |
 | Weather | $0.0005 USDC | Conditions at major trading hubs (NYC, London, Tokyo) |
 
@@ -148,8 +148,8 @@ This means every demo run produces a **different research report** with differen
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
-║  AUTONOMOUS DATA CONSUMER AGENT                            ║
-║  Mission: Produce investment research report                ║
+║  AUTONOMOUS DATA CONSUMER AGENT                              ║
+║  Mission: Produce investment research report                 ║
 ╚══════════════════════════════════════════════════════════════╝
 
 [STEP 1] Setting up wallet... 0x5Fa5...cb6f
@@ -161,7 +161,7 @@ This means every demo run produces a **different research report** with differen
   [13/13] Check conditions at Tokyo trading hub ($0.0005) -> OK
 
 ╔══════════════════════════════════════════════════════════════╗
-║            INVESTMENT RESEARCH REPORT                       ║
+║            INVESTMENT RESEARCH REPORT                        ║
 ╚══════════════════════════════════════════════════════════════╝
 
 ┌────────┬───────┬────────┬────────────────────────┬──────────┐
