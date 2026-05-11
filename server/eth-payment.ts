@@ -59,6 +59,11 @@ export function createEthPaymentMiddleware(
         return;
       }
       usedTxHashes.add(txHash);
+      // Pass buyer address to dataset handler for provenance recording
+      (req as Record<string, unknown>).headers = {
+        ...(req as Record<string, unknown>).headers as object,
+        "x-buyer-address": tx.from,
+      };
       next();
     } catch (err) {
       res.status(402).json({ error: "Could not verify payment", detail: String(err) });

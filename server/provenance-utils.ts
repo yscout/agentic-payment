@@ -75,6 +75,10 @@ export function extractBuyerAddressFromPaymentPayload(payload: unknown): string 
 }
 
 export function extractBuyerAddressFromRequest(req: PaymentRequestLike): string | undefined {
+  // ETH payment middleware sets this after verifying the tx
+  const buyerHeader = getHeader(req, "x-buyer-address");
+  if (isAddressLike(buyerHeader)) return buyerHeader;
+
   const directPayloads = [req.x402?.paymentPayload, req.paymentPayload];
   for (const payload of directPayloads) {
     const buyer = extractBuyerAddressFromPaymentPayload(payload);
