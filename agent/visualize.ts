@@ -150,12 +150,12 @@ export function generateHtmlReport(
 <div class="container">
   <header>
     <h1>Investment Research Report</h1>
-    <p>Generated autonomously by AI agent &middot; Data purchased via x402 protocol</p>
+    <p>Generated autonomously by AI agent &middot; Data purchased via ETH payments on Base Sepolia</p>
     <div class="meta-bar">
       <div class="meta-item">Wallet: <strong>${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}</strong></div>
       <div class="meta-item">Queries: <strong>${queriesCompleted}</strong></div>
-      <div class="meta-item">Cost: <strong>$${totalSpent.toFixed(4)} USDC</strong></div>
-      <div class="meta-item">Remaining: <strong>${remainingBalance} USDC</strong></div>
+      <div class="meta-item">Cost: <strong>${totalSpent.toFixed(8)} ETH</strong></div>
+      <div class="meta-item">Remaining: <strong>${remainingBalance} ETH</strong></div>
       <div class="meta-item">Time: <strong>${timestamp}</strong></div>
     </div>
   </header>
@@ -188,7 +188,7 @@ export function generateHtmlReport(
 
   <div class="footer">
     All data purchased autonomously from data provider agent using
-    <a href="https://docs.x402.org" target="_blank">x402</a> on Base Sepolia.
+    ETH payments on Base Sepolia.
     No human approved any payment.
   </div>
 </div>

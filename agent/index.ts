@@ -5,21 +5,18 @@
  *
  * The agent needs sentiment data, financial analysis, and market
  * conditions -- but it doesn't have this data. It buys it from
- * a Data Provider agent, paying per-query with USDC via the x402
- * protocol. No human approves any payment.
+ * a Data Provider agent, paying per-query with ETH on Base Sepolia.
+ * No human approves any payment.
  *
  * Flow:
  *   1. Create/load wallet
  *   2. Plan research (13 data purchases needed)
- *   3. Buy data query-by-query (x402 auto-pay)
+ *   3. Buy data query-by-query (send ETH → include tx hash)
  *   4. Assemble findings into an investment report
  *   5. Verify all purchases on-chain
  */
 
 import { ethers } from "ethers";
-import { privateKeyToAccount } from "viem/accounts";
-import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
-import { ExactEvmScheme } from "@x402/evm";
 
 import { AGENT_CONFIG, DATASET_ENDPOINTS, type DatasetType } from "./config.js";
 import { buildResearchPlan, type QueryTask } from "./queries.js";
@@ -33,11 +30,6 @@ import {
 } from "./report.js";
 import { verifyPurchaseHistory } from "./provenance.js";
 import { saveAndOpenReport } from "./visualize.js";
-
-const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
-const ERC20_ABI = [
-  "function balanceOf(address) view returns (uint256)",
-];
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -67,48 +59,39 @@ async function setupWallet(): Promise<{
   return { wallet, provider };
 }
 
-async function getUsdcBalance(
-  provider: ethers.JsonRpcProvider,
-  address: string,
-): Promise<bigint> {
-  const usdc = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, provider);
-  return usdc.balanceOf(address);
-}
-
-function formatUsdc(amount: bigint): string {
-  return (Number(amount) / 1e6).toFixed(6);
-}
-
-function createPaymentFetch(privateKey: string) {
-  const account = privateKeyToAccount(privateKey as `0x${string}`);
-
-  return wrapFetchWithPaymentFromConfig(fetch, {
-    schemes: [
-      {
-        network: AGENT_CONFIG.x402Network as `${string}:${string}`,
-        client: new ExactEvmScheme(account),
-      },
-    ],
-  });
+async function sendEthPayment(
+  wallet: ethers.Wallet | ethers.HDNodeWallet,
+  to: string,
+  amountWei: bigint,
+): Promise<string> {
+  const tx = await wallet.sendTransaction({ to, value: amountWei });
+  await tx.wait(1);
+  return tx.hash;
 }
 
 async function buyData(
-  paymentFetch: typeof fetch,
+  wallet: ethers.Wallet | ethers.HDNodeWallet,
   dataset: DatasetType,
   query: string,
 ): Promise<{ ok: boolean; status: number; data: unknown }> {
   const endpoint = DATASET_ENDPOINTS[dataset];
   const url = `${AGENT_CONFIG.serverUrl}${endpoint.path}`;
+  const amountWei = ethers.parseEther(endpoint.priceEth);
 
-  const response = await paymentFetch(url, {
+  const txHash = await sendEthPayment(wallet, AGENT_CONFIG.providerWalletAddress, amountWei);
+
+  const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-Payment-Tx": txHash,
+    },
     body: JSON.stringify({ query }),
   });
 
   if (!response.ok) {
     if (response.status === 402) {
-      return { ok: false, status: 402, data: "Insufficient USDC balance" };
+      return { ok: false, status: 402, data: "Payment rejected by server" };
     }
     return { ok: false, status: response.status, data: await response.text() };
   }
@@ -134,25 +117,38 @@ async function main(): Promise<void> {
   console.log("╔══════════════════════════════════════════════════════════════╗");
   console.log("║  AUTONOMOUS DATA CONSUMER AGENT                            ║");
   console.log("║  Mission: Produce investment research report                ║");
-  console.log("║  Payment: x402 protocol on Base Sepolia                    ║");
+  console.log("║  Payment: ETH on Base Sepolia                              ║");
   console.log("╚══════════════════════════════════════════════════════════════╝\n");
 
   // --- Step 1: Wallet ---
   log("STEP 1: Setting up wallet...");
+
+  // Verify server is reachable before spending any ETH
+  try {
+    const health = await fetch(`${AGENT_CONFIG.serverUrl}/health`);
+    if (!health.ok) throw new Error(`status ${health.status}`);
+  } catch (err) {
+    log(`Server not reachable at ${AGENT_CONFIG.serverUrl} -- start the server first`);
+    log("  Run: npm run server");
+    process.exit(1);
+  }
+
   const { wallet, provider } = await setupWallet();
 
-  const usdc = await getUsdcBalance(provider, wallet.address);
   const eth = await provider.getBalance(wallet.address);
-  log(`  ETH:  ${ethers.formatEther(eth)}`);
-  log(`  USDC: ${formatUsdc(usdc)}`);
+  log(`  ETH: ${ethers.formatEther(eth)}`);
 
-  if (usdc === 0n) {
+  if (eth === 0n) {
     log("");
-    log("No USDC balance. Fund this wallet to proceed:");
+    log("No ETH balance. Fund this wallet to proceed:");
     log(`  Address: ${wallet.address}`);
     log(`  ETH faucet: https://www.coinbase.com/faucets/base-ethereum-goerli-faucet`);
-    log(`  USDC faucet: https://faucet.circle.com/ (select Base Sepolia)`);
     log(`  Then set AGENT_PRIVATE_KEY=${wallet.privateKey} in .env`);
+    process.exit(1);
+  }
+
+  if (!AGENT_CONFIG.providerWalletAddress) {
+    log("PROVIDER_WALLET_ADDRESS not set in .env");
     process.exit(1);
   }
 
@@ -162,8 +158,7 @@ async function main(): Promise<void> {
 
   let estimatedCost = 0;
   for (const task of tasks) {
-    const price = parseFloat(DATASET_ENDPOINTS[task.dataset].price.replace("$", ""));
-    estimatedCost += price;
+    estimatedCost += parseFloat(DATASET_ENDPOINTS[task.dataset].priceEth);
   }
 
   log(`  Target stocks:    AAPL, TSLA, NVDA, GOOGL, AMZN`);
@@ -171,14 +166,13 @@ async function main(): Promise<void> {
   log(`    - ${tasks.filter(t => t.dataset === "sentiment").length} sentiment queries`);
   log(`    - ${tasks.filter(t => t.dataset === "financial").length} financial queries`);
   log(`    - ${tasks.filter(t => t.dataset === "weather").length} weather queries`);
-  log(`  Estimated cost:   $${estimatedCost.toFixed(4)} USDC`);
-  log(`  Available budget: ${formatUsdc(usdc)} USDC`);
+  log(`  Estimated cost:   ${estimatedCost.toFixed(8)} ETH`);
+  log(`  Available budget: ${ethers.formatEther(eth)} ETH`);
 
   // --- Step 3: Buy data ---
   log("\nSTEP 3: Purchasing data from provider...");
-  log("  (x402 handles payment automatically on each request)\n");
+  log("  (sending ETH payment with each request)\n");
 
-  const paymentFetch = createPaymentFetch(wallet.privateKey);
   const collected = createEmptyCollection();
   let completedCount = 0;
   let failedCount = 0;
@@ -186,17 +180,17 @@ async function main(): Promise<void> {
 
   for (let i = 0; i < tasks.length; i++) {
     const task = tasks[i];
-    const price = parseFloat(DATASET_ENDPOINTS[task.dataset].price.replace("$", ""));
+    const priceEth = parseFloat(DATASET_ENDPOINTS[task.dataset].priceEth);
     const progress = `[${i + 1}/${tasks.length}]`;
 
     log(`${progress} ${task.purpose} (${DATASET_ENDPOINTS[task.dataset].price})`);
 
     try {
-      const result = await buyData(paymentFetch, task.dataset, task.query);
+      const result = await buyData(wallet, task.dataset, task.query);
 
       if (!result.ok) {
         if (result.status === 402) {
-          log(`  FAILED: Out of funds -- cannot complete research`);
+          log(`  FAILED: Payment rejected -- cannot complete research`);
           failedCount++;
           break;
         }
@@ -206,7 +200,7 @@ async function main(): Promise<void> {
       }
 
       storeResult(collected, task, result.data);
-      totalSpent += price;
+      totalSpent += priceEth;
       completedCount++;
 
       const summary = JSON.stringify(result.data).slice(0, 80);
@@ -223,7 +217,7 @@ async function main(): Promise<void> {
   // --- Step 4: Generate report ---
   log("\nSTEP 4: Assembling research report...");
 
-  const finalUsdc = await getUsdcBalance(provider, wallet.address);
+  const finalEth = await provider.getBalance(wallet.address);
 
   if (completedCount === 0) {
     log("  No data collected -- cannot generate report");
@@ -234,7 +228,7 @@ async function main(): Promise<void> {
       totalSpent,
       wallet.address,
       completedCount,
-      formatUsdc(finalUsdc),
+      ethers.formatEther(finalEth),
     );
   }
 
@@ -244,11 +238,22 @@ async function main(): Promise<void> {
   console.log("╚══════════════════════════════════════════════════════════════╝");
   log(`Queries completed: ${completedCount}/${tasks.length}`);
   log(`Queries failed:    ${failedCount}`);
-  log(`Total spent:       $${totalSpent.toFixed(4)} USDC`);
-  log(`Remaining balance: ${formatUsdc(finalUsdc)} USDC`);
+  log(`Total spent:       ${totalSpent.toFixed(8)} ETH`);
+  log(`Remaining balance: ${ethers.formatEther(finalEth)} ETH`);
   log(`Wallet:            ${wallet.address}`);
 
   await verifyPurchaseHistory(wallet.address);
+
+  if (AGENT_CONFIG.marketplaceAddress) {
+    const basescanUrl = `https://sepolia.basescan.org/address/${AGENT_CONFIG.marketplaceAddress}#events`;
+    log(`\nOn-chain purchases: ${basescanUrl}`);
+    const { execSync } = await import("child_process");
+    try {
+      execSync(`open "${basescanUrl}"`, { stdio: "ignore" });
+    } catch {
+      // non-Mac fallback already printed the URL above
+    }
+  }
 
   log("\nAgent shut down.");
 }

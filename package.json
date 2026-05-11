@@ -8,6 +8,8 @@
     "agent:demo": "npx tsx agent/demo.ts",
     "server": "npx tsx server/index.ts",
     "server:mock": "npx tsx server/mock.ts",
+    "deploy": "npx hardhat run scripts/deploy.cjs --network base-sepolia",
+    "demo": "bash scripts/demo.sh",
     "test": "node --test --import tsx test/server-datasets.test.ts test/server-provenance-utils.test.ts"
   },
   "repository": {

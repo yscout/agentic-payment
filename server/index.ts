@@ -1,77 +1,34 @@
 import express, { type Express } from "express";
-import { paymentMiddleware, x402ResourceServer } from "@x402/express";
-import { HTTPFacilitatorClient } from "@x402/core/server";
-import { ExactEvmScheme } from "@x402/evm/exact/server";
+import { ethers } from "ethers";
 import { fileURLToPath } from "url";
 
 import { SERVER_CONFIG } from "./config.js";
 import { createDatasetHandler, type ProvenanceRecorder } from "./datasets.js";
 import { DATASETS } from "./pricing.js";
 import { createProvenanceRecorder } from "./provenance.js";
+import { createEthPaymentMiddleware } from "./eth-payment.js";
 
 interface CreateAppOptions {
-  enableX402?: boolean;
+  enableEthPayment?: boolean;
   provenanceRecorder?: ProvenanceRecorder;
 }
 
-export function buildPaymentRoutes(payTo: string) {
+function buildPaymentRoutes(payTo: string) {
   return {
-    "POST /api/data/sentiment": {
-      accepts: [
-        {
-          scheme: "exact",
-          price: DATASETS.sentiment.price,
-          network: SERVER_CONFIG.x402Network,
-          payTo,
-        },
-      ],
-      description: DATASETS.sentiment.description,
-      mimeType: "application/json",
-    },
-    "POST /api/data/financial": {
-      accepts: [
-        {
-          scheme: "exact",
-          price: DATASETS.financial.price,
-          network: SERVER_CONFIG.x402Network,
-          payTo,
-        },
-      ],
-      description: DATASETS.financial.description,
-      mimeType: "application/json",
-    },
-    "POST /api/data/weather": {
-      accepts: [
-        {
-          scheme: "exact",
-          price: DATASETS.weather.price,
-          network: SERVER_CONFIG.x402Network,
-          payTo,
-        },
-      ],
-      description: DATASETS.weather.description,
-      mimeType: "application/json",
-    },
+    "POST /api/data/sentiment": { amountWei: DATASETS.sentiment.priceWei, payTo },
+    "POST /api/data/financial": { amountWei: DATASETS.financial.priceWei, payTo },
+    "POST /api/data/weather":   { amountWei: DATASETS.weather.priceWei,   payTo },
   };
 }
 
-function createX402Middleware() {
+function createPaymentMiddleware() {
   if (!SERVER_CONFIG.providerWalletAddress) {
-    throw new Error("PROVIDER_WALLET_ADDRESS is required when ENABLE_X402=true");
+    throw new Error("PROVIDER_WALLET_ADDRESS is required");
   }
-
-  const facilitatorClient = new HTTPFacilitatorClient({
-    url: SERVER_CONFIG.x402FacilitatorUrl,
-  });
-
-  const resourceServer = new x402ResourceServer(facilitatorClient).register(
-    SERVER_CONFIG.x402Network as `${string}:${string}`,
-    new ExactEvmScheme(),
-  );
-
-  return paymentMiddleware(
-    buildPaymentRoutes(SERVER_CONFIG.providerWalletAddress),
-    resourceServer,
+  const provider = new ethers.JsonRpcProvider(SERVER_CONFIG.rpcUrl);
+  return createEthPaymentMiddleware(
+    buildPaymentRoutes(ethers.getAddress(SERVER_CONFIG.providerWalletAddress)),
+    provider,
   );
 }
 
@@ -83,7 +40,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
     res.json({
       ok: true,
       service: "agentic-payment-data-provider",
-      x402: options.enableX402 ?? SERVER_CONFIG.enableX402,
+      payment: "ETH",
       datasets: Object.values(DATASETS).map((dataset) => ({
         id: dataset.id,
         name: dataset.name,
@@ -92,11 +49,11 @@ export function createApp(options: CreateAppOptions = {}): Express {
     });
   });
 
-  const enableX402 = options.enableX402 ?? SERVER_CONFIG.enableX402;
-  if (enableX402) {
-    app.use(createX402Middleware());
+  const enableEthPayment = options.enableEthPayment ?? true;
+  if (enableEthPayment) {
+    app.use(createPaymentMiddleware());
   } else {
-    console.warn("[server] ENABLE_X402=false; data endpoints are not payment-gated");
+    console.warn("[server] ETH payment disabled; data endpoints are not payment-gated");
   }
 
   const recorder =
@@ -109,7 +66,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
 
   app.post(DATASETS.sentiment.path, createDatasetHandler("sentiment", recorder));
   app.post(DATASETS.financial.path, createDatasetHandler("financial", recorder));
-  app.post(DATASETS.weather.path, createDatasetHandler("weather", recorder));
+  app.post(DATASETS.weather.path,   createDatasetHandler("weather", recorder));
 
   app.use((_req, res) => {
     res.status(404).json({ error: "Not found" });
@@ -124,6 +81,6 @@ if (isMain) {
   const app = createApp();
   app.listen(SERVER_CONFIG.port, () => {
     console.log(`Data provider running on http://localhost:${SERVER_CONFIG.port}`);
-    console.log(`x402 payments: ${SERVER_CONFIG.enableX402 ? "enabled" : "disabled"}`);
+    console.log(`ETH payments: enabled`);
   });
 }

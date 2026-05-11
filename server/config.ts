@@ -15,7 +15,7 @@ function numberFromEnv(value: string | undefined, fallback: number): number {
 export const SERVER_CONFIG = {
   port: numberFromEnv(process.env.PORT, 4021),
   rpcUrl: process.env.RPC_URL || "https://sepolia.base.org",
-  x402Network: process.env.X402_NETWORK || "eip155:84532",
+  x402Network: (process.env.X402_NETWORK || "eip155:84532") as `${string}:${string}`,
   x402FacilitatorUrl: process.env.X402_FACILITATOR_URL || "https://x402.org/facilitator",
   providerWalletAddress: process.env.PROVIDER_WALLET_ADDRESS || "",
   providerPrivateKey: process.env.PROVIDER_PRIVATE_KEY || "",

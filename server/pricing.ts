@@ -4,7 +4,8 @@ export const DATASETS = {
     path: "/api/data/sentiment",
     name: "sentiment",
     description: "Market sentiment analysis",
-    price: "$0.001",
+    price: "0.000001 ETH",
+    priceWei: 1_000_000_000_000n,
     priceUsdMicro: 1000,
   },
   financial: {
@@ -12,7 +13,8 @@ export const DATASETS = {
     path: "/api/data/financial",
     name: "financial",
     description: "Financial news summary",
-    price: "$0.002",
+    price: "0.000002 ETH",
+    priceWei: 2_000_000_000_000n,
     priceUsdMicro: 2000,
   },
   weather: {
@@ -20,7 +22,8 @@ export const DATASETS = {
     path: "/api/data/weather",
     name: "weather",
     description: "Weather forecast data",
-    price: "$0.0005",
+    price: "0.0000005 ETH",
+    priceWei: 500_000_000_000n,
     priceUsdMicro: 500,
   },
 } as const;
