@@ -11,13 +11,13 @@ The system includes a real x402-enabled data provider, a mock data provider for 
 ## Architecture
 
 ```text
-Consumer Agent (agent/)          Data Provider (server/)          Base Sepolia
-┌──────────────────┐            ┌──────────────────────┐        ┌──────────────────┐
-│ ethers.js wallet │──POST───>  │ Express + x402       │        │ USDC token       │
-│ x402 auto-pay    │<──402───── │ paymentMiddleware    │        │ DataMarketplace  │
-│ research plan    │──pay+retry>│ dataset handlers     │──tx──> │ contract         │
-│ report generator │<──data──── │ randomized data      │        │ (purchase logs)  │
-└──────────────────┘            └──────────────────────┘        └──────────────────┘
+Consumer Agent (agent/)             Data Provider (server/)          Base Sepolia
+┌──────────────────┐              ┌──────────────────────┐        ┌──────────────────┐
+│ ethers.js wallet │──POST──────> │ Express + x402       │        │ USDC token       │
+│ x402 auto-pay    │<──402─────── │ paymentMiddleware    │        │ DataMarketplace  │
+│ research plan    │──pay+retry──>│ dataset handlers     │──tx──> │ contract         │
+│ report generator │<──data────── │ randomized data      │        │ (purchase logs)  │
+└──────────────────┘              └──────────────────────┘        └──────────────────┘
 ```
 
 ## Components
