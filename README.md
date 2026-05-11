@@ -28,7 +28,6 @@ Consumer Agent (agent/)             Data Provider (server/)          Base Sepoli
 | `server/` | Express data provider with x402 payment middleware |
 | `server/mock.ts` | Mock data provider with randomized responses for development |
 | `agent/` | Autonomous consumer agent with x402 auto-pay |
-| Integration | Demo script, generated report, and presentation materials |
 
 ## Team Contributions
 
@@ -37,7 +36,7 @@ Consumer Agent (agent/)             Data Provider (server/)          Base Sepoli
 | Angie Hu | Built the `contracts/` component, including `DataMarketplace.sol`, the on-chain dataset registry and purchase provenance system |
 | Yutao Mao | Built the `server/` component, including the Express data provider and x402 payment middleware |
 | Tianliang Song | Built `server/mock.ts` and the `agent/` component, including the mock data provider, autonomous consumer agent, and x402 auto-pay flow |
-| Xuechen Wang | Led integration work, including the demo script, generated report, and presentation slides |
+| Xuechen Wang | Led integration work, including the demo script and generated report |
 
 ## Quick Start
 
