@@ -10,16 +10,22 @@ Person C (Consumer Agent), Person D (Integration + Demo).
 
 | Segment | Speaker        | Topic                              | Time         |
 | ------- | -------------- | ---------------------------------- | ------------ |
-| Intro   | Xuechen (D)    | Problem framing + what we built    | 0:00 – 0:30  |
+| Intro   | Tianliang (C)  | Problem framing + what we built    | 0:00 – 0:30  |
 | Part 1  | Angie (A)      | Smart contract: on-chain provenance| 0:30 – 1:45  |
 | Part 2  | Yutao (B)      | Server: HTTP payment middleware    | 1:45 – 3:00  |
 | Part 3  | Tianliang (C)  | Autonomous consumer agent          | 3:00 – 4:00  |
 | Demo    | Xuechen (D)    | Live demo + BaseScan audit         | 4:00 – 4:45  |
 | Close   | Xuechen (D)    | Limitations + so what              | 4:45 – 5:00  |
 
+**Per-speaker total time:**
+- Tianliang: 1:30 (intro + agent — he built the agent, so opens and explains his own work)
+- Angie: 1:15
+- Yutao: 1:15
+- Xuechen: 1:00 (demo + close — integration lead, ties it all together at the end)
+
 ---
 
-## 0:00 – 0:30 · Intro — Xuechen (Person D)
+## 0:00 – 0:30 · Intro — Tianliang (Person C)
 
 > Imagine an AI agent that needs to buy data to make decisions in real time —
 > stock sentiment, weather, news. How does it pay the provider? Not with
@@ -30,6 +36,10 @@ Person C (Consumer Agent), Person D (Integration + Demo).
 > creates its own wallet, pays per query in ETH on Base Sepolia, and every
 > single purchase is recorded immutably on-chain. No human approves any
 > payment, and the entire audit trail is verifiable by anyone — including you.
+>
+> I'll come back later to walk you through the agent itself. But first,
+> Angie will show you the foundation — the smart contract that makes
+> every payment verifiable.
 
 *(Hand off to Angie.)*
 
@@ -100,9 +110,9 @@ Person C (Consumer Agent), Person D (Integration + Demo).
 
 ## 3:00 – 4:00 · Consumer Agent — Tianliang (Person C)
 
-> The agent is the autonomous piece. On startup, it loads an `ethers.js`
-> wallet — either from a private key in `.env`, or it generates a fresh one.
-> No MetaMask, no human signing prompts, no OAuth.
+> Back to me. The agent is the autonomous piece. On startup, it loads an
+> `ethers.js` wallet — either from a private key in `.env`, or it generates
+> a fresh one. No MetaMask, no human signing prompts, no OAuth.
 >
 > The agent has a mission: produce a buy / hold / sell summary for five
 > stocks — Apple, Tesla, NVIDIA, Google, and Amazon. To produce that
@@ -121,7 +131,7 @@ Person C (Consumer Agent), Person D (Integration + Demo).
 > all entries and compares that total against what its own internal counter
 > says it spent. If those two numbers don't match — we have a bug somewhere.
 
-*(Hand off back to Xuechen for the demo.)*
+*(Hand off to Xuechen for the demo.)*
 
 ---
 
