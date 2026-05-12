@@ -1,5 +1,6 @@
 import { expect } from "chai";
-import { ethers } from "hardhat";
+import pkg from "hardhat";
+const { ethers } = pkg;
 
 describe("DataMarketplace", function () {
   async function deployFixture() {
@@ -70,7 +71,7 @@ describe("DataMarketplace", function () {
 
       expect(dataset.name).to.equal("sentiment");
       expect(dataset.description).to.equal("Market sentiment analysis");
-      expect(dataset.priceUsd).to.equal(1000);
+      expect(dataset.price).to.equal(1000);
       expect(dataset.active).to.equal(true);
     });
 
@@ -82,13 +83,13 @@ describe("DataMarketplace", function () {
       const weather = await marketplace.getDataset(2);
 
       expect(sentiment.name).to.equal("sentiment");
-      expect(sentiment.priceUsd).to.equal(1000);
+      expect(sentiment.price).to.equal(1000);
 
       expect(financial.name).to.equal("financial");
-      expect(financial.priceUsd).to.equal(2000);
+      expect(financial.price).to.equal(2000);
 
       expect(weather.name).to.equal("weather");
-      expect(weather.priceUsd).to.equal(500);
+      expect(weather.price).to.equal(500);
 
       expect(await marketplace.getDatasetCount()).to.equal(3);
     });
@@ -301,6 +302,44 @@ describe("DataMarketplace", function () {
       await expect(marketplace.getPurchase(0)).to.be.revertedWith(
         "DataMarketplace: invalid purchase"
       );
+    });
+
+    it("records wei-scale purchases that roundtrip exactly (no USD lie)", async function () {
+      const { marketplace, owner } = await deployFixture();
+
+      // Real wei values matching server/pricing.ts
+      const sentimentWei = 1_000_000_000_000n; // 0.000001 ETH
+      const financialWei = 2_000_000_000_000n; // 0.000002 ETH
+      const weatherWei = 500_000_000_000n; //   0.0000005 ETH
+
+      await marketplace.registerDataset("sentiment", "", sentimentWei);
+      await marketplace.registerDataset("financial", "", financialWei);
+      await marketplace.registerDataset("weather", "", weatherWei);
+
+      const sentimentDs = await marketplace.getDataset(0);
+      const weatherDs = await marketplace.getDataset(2);
+      expect(sentimentDs.price).to.equal(sentimentWei);
+      expect(weatherDs.price).to.equal(weatherWei);
+      expect(ethers.formatEther(sentimentDs.price)).to.equal("0.000001");
+      expect(ethers.formatEther(weatherDs.price)).to.equal("0.0000005");
+
+      const hash = ethers.keccak256(ethers.toUtf8Bytes("AAPL"));
+      await marketplace.recordPurchase(owner.address, 0, sentimentWei, hash);
+      await marketplace.recordPurchase(owner.address, 1, financialWei, hash);
+      await marketplace.recordPurchase(owner.address, 2, weatherWei, hash);
+
+      const purchaseIds = await marketplace.getPurchasesByBuyer(owner.address);
+      const p0 = await marketplace.getPurchase(purchaseIds[0]);
+      const p1 = await marketplace.getPurchase(purchaseIds[1]);
+      const p2 = await marketplace.getPurchase(purchaseIds[2]);
+
+      expect(p0.pricePaid).to.equal(sentimentWei);
+      expect(p1.pricePaid).to.equal(financialWei);
+      expect(p2.pricePaid).to.equal(weatherWei);
+
+      const totalWei = p0.pricePaid + p1.pricePaid + p2.pricePaid;
+      expect(totalWei).to.equal(3_500_000_000_000n);
+      expect(ethers.formatEther(totalWei)).to.equal("0.0000035");
     });
   });
 });

@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { ethers } from "ethers";
 
 import {
   createDatasetHandler,
@@ -7,6 +8,8 @@ import {
   validateQuery,
   type RecordPurchaseInput,
 } from "../server/datasets.js";
+import { buildPurchaseArgs } from "../server/provenance.js";
+import { DATASETS } from "../server/pricing.js";
 
 function createMockResponse() {
   return {
@@ -99,7 +102,39 @@ test("dataset handler records provenance when a paid request includes a buyer ad
     buyer,
     dataset: "weather",
     datasetId: 2,
-    pricePaid: 500,
+    pricePaid: 500_000_000_000n,
     query: "Tokyo",
   });
+});
+
+test("buildPurchaseArgs forwards wei (bigint), not micro-USD", () => {
+  const [buyer, datasetId, pricePaid, queryHash] = buildPurchaseArgs({
+    buyer: "0x1111111111111111111111111111111111111111",
+    dataset: "sentiment",
+    datasetId: DATASETS.sentiment.id,
+    pricePaid: DATASETS.sentiment.priceWei,
+    query: "AAPL",
+  });
+
+  assert.equal(buyer, "0x1111111111111111111111111111111111111111");
+  assert.equal(datasetId, 0);
+  assert.equal(typeof pricePaid, "bigint");
+  assert.equal(pricePaid, 1_000_000_000_000n);
+  assert.equal(ethers.formatEther(pricePaid), "0.000001");
+  assert.match(queryHash, /^0x[0-9a-f]{64}$/);
+});
+
+test("on-chain pricePaid for every dataset matches advertised ETH price", () => {
+  for (const dataset of Object.values(DATASETS)) {
+    const [, , pricePaid] = buildPurchaseArgs({
+      buyer: "0x1111111111111111111111111111111111111111",
+      dataset: dataset.name,
+      datasetId: dataset.id,
+      pricePaid: dataset.priceWei,
+      query: "x",
+    });
+    const advertisedEth = parseFloat(dataset.price.replace(" ETH", ""));
+    const onChainEth = Number(ethers.formatEther(pricePaid));
+    assert.equal(onChainEth, advertisedEth);
+  }
 });

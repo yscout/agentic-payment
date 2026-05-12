@@ -244,7 +244,8 @@ async function main(): Promise<void> {
 
   await verifyPurchaseHistory(wallet.address);
 
-  if (AGENT_CONFIG.marketplaceAddress) {
+  const isLocalChain = /127\.0\.0\.1|localhost/.test(AGENT_CONFIG.rpcUrl);
+  if (AGENT_CONFIG.marketplaceAddress && !isLocalChain) {
     const basescanUrl = `https://sepolia.basescan.org/address/${AGENT_CONFIG.marketplaceAddress}#events`;
     log(`\nOn-chain purchases: ${basescanUrl}`);
     const { execSync } = await import("child_process");
@@ -253,6 +254,9 @@ async function main(): Promise<void> {
     } catch {
       // non-Mac fallback already printed the URL above
     }
+  } else if (AGENT_CONFIG.marketplaceAddress && isLocalChain) {
+    log(`\nRunning on local Hardhat chain (RPC: ${AGENT_CONFIG.rpcUrl}).`);
+    log(`Contract address ${AGENT_CONFIG.marketplaceAddress} only exists locally.`);
   }
 
   log("\nAgent shut down.");

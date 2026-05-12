@@ -21,17 +21,17 @@ async function main() {
     {
       name: "sentiment",
       description: "Market sentiment analysis",
-      priceUsd: 1000,
+      priceWei: 1_000_000_000_000n,
     },
     {
       name: "financial",
       description: "Financial news summary",
-      priceUsd: 2000,
+      priceWei: 2_000_000_000_000n,
     },
     {
       name: "weather",
       description: "Weather forecast data",
-      priceUsd: 500,
+      priceWei: 500_000_000_000n,
     },
   ];
 
@@ -39,12 +39,14 @@ async function main() {
     const tx = await marketplace.registerDataset(
       dataset.name,
       dataset.description,
-      dataset.priceUsd
+      dataset.priceWei
     );
     await tx.wait();
 
     console.log(
-      `Registered dataset: ${dataset.name} (${dataset.priceUsd} micro-USD)`
+      `Registered dataset: ${dataset.name} (${ethers.formatEther(
+        dataset.priceWei
+      )} ETH)`
     );
   }
 

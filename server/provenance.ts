@@ -16,22 +16,26 @@ export interface ContractLike {
   recordPurchase(
     buyer: string,
     datasetId: number,
-    pricePaid: number,
+    pricePaid: bigint,
     queryHash: string,
   ): Promise<{ hash?: string; wait?: (confirmations?: number) => Promise<unknown> }>;
 }
 
-export function buildPurchaseArgs(input: RecordPurchaseInput): [string, number, number, string] {
+export function buildPurchaseArgs(input: RecordPurchaseInput): [string, number, bigint, string] {
   const metadata = DATASETS[input.dataset];
   const datasetId = input.datasetId ?? metadata.id;
-  const pricePaid = input.pricePaid ?? metadata.priceUsdMicro;
+  const pricePaid = input.pricePaid ?? metadata.priceWei;
   const queryHash = ethers.keccak256(ethers.toUtf8Bytes(input.query));
 
   return [input.buyer, datasetId, pricePaid, queryHash];
 }
 
 export class ContractProvenanceRecorder implements ProvenanceRecorder {
-  constructor(private readonly contract: ContractLike) {}
+  private readonly contract: ContractLike;
+
+  constructor(contract: ContractLike) {
+    this.contract = contract;
+  }
 
   async recordPurchase(input: RecordPurchaseInput): Promise<void> {
     const tx = await this.contract.recordPurchase(...buildPurchaseArgs(input));

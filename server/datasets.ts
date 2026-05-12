@@ -33,7 +33,7 @@ export interface RecordPurchaseInput {
   buyer: string;
   dataset: DatasetType;
   datasetId: number;
-  pricePaid: number;
+  pricePaid: bigint;
   query: string;
 }
 
@@ -326,7 +326,7 @@ function recordProvenanceBestEffort(
       buyer,
       dataset,
       datasetId: metadata.id,
-      pricePaid: metadata.priceUsdMicro,
+      pricePaid: metadata.priceWei,
       query,
     }).catch((err: unknown) => {
       const message = err instanceof Error ? err.message : String(err);

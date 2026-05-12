@@ -4,7 +4,7 @@ import { AGENT_CONFIG } from "./config.js";
 const DATA_MARKETPLACE_ABI = [
   "function getPurchasesByBuyer(address buyer) view returns (uint256[])",
   "function getPurchase(uint256 id) view returns (tuple(address buyer, uint256 datasetId, uint256 pricePaid, bytes32 queryHash, uint256 timestamp))",
-  "function getDataset(uint256 id) view returns (tuple(string name, string description, uint256 priceUsd, bool active))",
+  "function getDataset(uint256 id) view returns (tuple(string name, string description, uint256 price, bool active))",
   "function getDatasetCount() view returns (uint256)",
   "function getTotalPurchases() view returns (uint256)",
 ];
@@ -20,7 +20,7 @@ interface Purchase {
 interface Dataset {
   name: string;
   description: string;
-  priceUsd: bigint;
+  price: bigint;
   active: boolean;
 }
 
@@ -54,7 +54,7 @@ export async function verifyPurchaseHistory(
 
     for (let i = 0; i < Number(datasetCount); i++) {
       const ds: Dataset = await contract.getDataset(i);
-      console.log(`  [${i}] ${ds.name} -- $${Number(ds.priceUsd) / 1e6}`);
+      console.log(`  [${i}] ${ds.name} -- ${ethers.formatEther(ds.price)} ETH`);
     }
 
     const purchaseIds: bigint[] =
@@ -71,19 +71,22 @@ export async function verifyPurchaseHistory(
           ? ((await contract.getDataset(Number(p.datasetId))) as Dataset).name
           : `dataset#${p.datasetId}`;
 
-      const priceUsd = Number(p.pricePaid) / 1e6;
+      const priceEth = ethers.formatEther(p.pricePaid);
       const time = new Date(Number(p.timestamp) * 1000).toISOString();
 
-      console.log(`  #${id}: ${datasetName} | $${priceUsd} | ${time}`);
+      console.log(`  #${id}: ${datasetName} | ${priceEth} ETH | ${time}`);
       totalSpent += p.pricePaid;
     }
 
     console.log(
-      `\nTotal spent (on-chain verified): $${Number(totalSpent) / 1e6}`,
+      `\nTotal spent (on-chain verified): ${ethers.formatEther(totalSpent)} ETH`,
     );
-    console.log(
-      `View on BaseScan: https://sepolia.basescan.org/address/${AGENT_CONFIG.marketplaceAddress}#events`,
-    );
+    const isLocalChain = /127\.0\.0\.1|localhost/.test(AGENT_CONFIG.rpcUrl);
+    if (!isLocalChain) {
+      console.log(
+        `View on BaseScan: https://sepolia.basescan.org/address/${AGENT_CONFIG.marketplaceAddress}#events`,
+      );
+    }
   } catch (err) {
     console.error("[Provenance] Failed to read contract:", err);
   }

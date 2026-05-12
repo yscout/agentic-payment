@@ -7,14 +7,14 @@ contract DataMarketplace {
     struct Dataset {
         string name;
         string description;
-        uint256 priceUsd; // micro-USD: 1000 = $0.001
+        uint256 price; // in wei (native token, e.g. ETH on Base Sepolia)
         bool active;
     }
 
     struct Purchase {
         address buyer;
         uint256 datasetId;
-        uint256 pricePaid; // micro-USD
+        uint256 pricePaid; // in wei
         bytes32 queryHash;
         uint256 timestamp;
     }
@@ -25,7 +25,7 @@ contract DataMarketplace {
     mapping(address => uint256[]) private purchasesByBuyer;
     mapping(address => bool) public authorizedRecorders;
 
-    event DatasetRegistered(uint256 indexed id, string name, uint256 priceUsd);
+    event DatasetRegistered(uint256 indexed id, string name, uint256 price);
 
     event PurchaseRecorded(
         uint256 indexed purchaseId,
@@ -66,10 +66,10 @@ contract DataMarketplace {
     function registerDataset(
         string calldata name,
         string calldata description,
-        uint256 priceUsd
+        uint256 price
     ) external onlyOwner {
         require(bytes(name).length > 0, "DataMarketplace: empty name");
-        require(priceUsd > 0, "DataMarketplace: zero price");
+        require(price > 0, "DataMarketplace: zero price");
 
         uint256 id = datasets.length;
 
@@ -77,12 +77,12 @@ contract DataMarketplace {
             Dataset({
                 name: name,
                 description: description,
-                priceUsd: priceUsd,
+                price: price,
                 active: true
             })
         );
 
-        emit DatasetRegistered(id, name, priceUsd);
+        emit DatasetRegistered(id, name, price);
     }
 
     function recordPurchase(

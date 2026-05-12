@@ -6,7 +6,6 @@ export const DATASETS = {
     description: "Market sentiment analysis",
     price: "0.000001 ETH",
     priceWei: 1_000_000_000_000n,
-    priceUsdMicro: 1000,
   },
   financial: {
     id: 1,
@@ -15,7 +14,6 @@ export const DATASETS = {
     description: "Financial news summary",
     price: "0.000002 ETH",
     priceWei: 2_000_000_000_000n,
-    priceUsdMicro: 2000,
   },
   weather: {
     id: 2,
@@ -24,7 +22,6 @@ export const DATASETS = {
     description: "Weather forecast data",
     price: "0.0000005 ETH",
     priceWei: 500_000_000_000n,
-    priceUsdMicro: 500,
   },
 } as const;
 
